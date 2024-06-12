@@ -2,6 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
 import { getFirestore } from "firebase/firestore"
+import Constants from 'expo-constants';
 import unOffuscate from "./unOffuscate";
 
 // TODO: Add SDKs for Firebase products that you want to use
@@ -9,12 +10,12 @@ import unOffuscate from "./unOffuscate";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-	apiKey: "<apiKey>",
-	authDomain: "<authDomain>",
-	projectId: "<projectId>",
-	storageBucket: "<storageBucket>",
-	messagingSenderId: "<messagingSenderId>",
-	appId: "<appId>"
+	apiKey: Constants.expoConfig.extra.firebaseApiKey,
+	authDomain: Constants.expoConfig.extra.firebaseAuthDomain,
+	projectId: Constants.expoConfig.extra.firebaseProjectId,
+	storageBucket: Constants.expoConfig.extra.firebaseStorageBucket,
+	messagingSenderId: Constants.expoConfig.extra.firebaseMessagingSenderId,
+	appId: Constants.expoConfig.extra.firebaseAppId,
 };
 
 const app = initializeApp(firebaseConfig);
@@ -23,8 +24,8 @@ const auth = getAuth();
 
 export const autoSignIn = async () => {
 	try {
-		const email = "<email>";
-		const password = "<password>";
+		const email = Constants.expoConfig.extra.firebaseDefaultUserEmail;
+		const password = Constants.expoConfig.extra.firebaseObfuscatedDefaultUserPassword;
 		await signInWithEmailAndPassword(auth, email, unOffuscate(password));
 		console.log("Utilisateur connecté avec succès !");
 		// Vous pouvez exécuter d'autres actions après la connexion réussie ici
