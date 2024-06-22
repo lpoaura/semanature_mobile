@@ -82,7 +82,13 @@ class CodeCesar extends Component {
                             <Text style={styles.description}>{question}</Text>
                             <Text style={styles.encodedText}>{this.state.newText}</Text>
                             <TextInput style={styles.inputTextField} onChangeText={this.handleInputTextChange} editable={true} placeholder="CODE" />
+                            {this.state.isSoundLoaded && (
+                                <TouchableOpacity style={styles.audioButton} onPress={() => this.playSound()}>
+                                    <Text style={styles.audioButtonText}>🔊</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
+                            
                         <View style={styles.rightAlign}>
                             <NextPage
                                 pageName={"GameOutcomePage"}
@@ -95,11 +101,6 @@ class CodeCesar extends Component {
                                 text="Valider"
                                 blockButton={true}
                             />
-                            {this.state.isSoundLoaded && (
-                                <TouchableOpacity style={styles.audioButton} onPress={() => this.playSound()}>
-                                    <Text style={styles.audioButtonText}>🔊</Text>
-                                </TouchableOpacity>
-                            )}
                         </View>
                     </ScrollView>
                 </View>
