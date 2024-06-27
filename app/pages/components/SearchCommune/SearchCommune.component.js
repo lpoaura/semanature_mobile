@@ -1,14 +1,14 @@
 import { Feather } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from "@react-native-community/netinfo";
 import { useNavigation } from '@react-navigation/native';
 import React, { Component, useEffect, useState } from 'react';
-import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, Text, TextInput, TouchableOpacity, View, Alert } from 'react-native';
 import { getAllCommunes } from './../../../utils/queries';
 import styles from './SearchCommune.component.style';
 import NormalizeStrings from './../../../utils/normalizeStrings';
+import databaseService from '../../../utils/localStorage';
 
-/*
+/* Recherche de parcours par commune
 */
 class SearchCommune extends Component {
     constructor(props) {
@@ -32,7 +32,7 @@ class SearchCommune extends Component {
                 </View>
                 <View style={styles.parcoursSeparator}>
                     <FlatList
-                        data={filteredDataSource} //Communes affichée en résultat de recherche
+                        data={filteredDataSource} // Communes affichées en résultat de recherche
                         keyExtractor={(item, index) => index.toString()}
                         ItemSeparatorComponent={() => { return (<View style={styles.parcoursSeparator} />) }}
                         style={styles.searchStyle}
@@ -41,7 +41,7 @@ class SearchCommune extends Component {
                                 <View>
                                     <TouchableOpacity
                                         style={styles.touchableItem}
-                                        onPress={() => { this.props.navigation.navigate("ParcoursChoicePage", { commune: item }); }}
+                                        onPress={() => { this.props.navigation.navigate("ParcoursChoicePage", { commune: item, mapRequestId: "" }); }}
                                     >
                                         <Text style={styles.textAreaStyle}> {item} </Text>
                                     </TouchableOpacity>
@@ -57,19 +57,19 @@ class SearchCommune extends Component {
 
 // Filtre le nom de commune retourné
 const searchFilterFunction = (text, props) => {
-    if (text) { // Pas vide
+    if (text) {
         const newData = props.allDataSource.filter(function (item) {
             const itemData = item
                 ? NormalizeStrings(item).replace('ST', 'SAINT')
                 : ''.toUpperCase(); // Rend insensible à la casse
             const textData = NormalizeStrings(text).replace('ST', 'SAINT');
             return itemData.indexOf(textData) > -1;
-        }).filter((item, i) => (i < 20)); // Limite du nombre de commune afficher en même temps "filtrée"
+        }).filter((item, i) => (i < 20)); // Limite du nombre de communes affichées en même temps "filtrées"
         props.setFilteredDataSource(newData); // Applique le filtre
-        props.setSearch(text); // Rempli le champs
-    } else {//vide
-        props.setFilteredDataSource(props.allDataSource); //réaffiche toute les communes
-        props.setSearch(text); // Rempli le champs
+        props.setSearch(text); // Remplit le champs
+    } else {
+        props.setFilteredDataSource(props.allDataSource); // Réaffiche toute les communes
+        props.setSearch(text); // Remplit le champ
     }
 };
 
@@ -89,7 +89,6 @@ export default function (props) {
 
     // vérifie la connection à internet
     useEffect(() => {
-
         const checkInternetAvailability = async () => {
             const netInfoState = await NetInfo.fetch();
             if (netInfoState.isInternetReachable != internetAvailable) {
@@ -109,29 +108,38 @@ export default function (props) {
 
     // charge les communes, par internet si possible, en local sinon
     async function chargeCommunes() {
-        var temp;
+        let temp = null;
 
-        // si internet on prend les communes de la firebase
+        // si internet on prend les communes de firebase
         if (internetAvailable) {
             temp = await getAllCommunes();
+                    
+            // attribution des communes aux bonnes variables
+            setAllDataSource(temp);
+            setFilteredDataSource(temp);
         }
-        if (temp == undefined || temp.length == 0) {
-            // si on n'a pas accès à la firebase, on regarde les communes disponible en local
-            temp = await AsyncStorage.getItem('commune');
-            temp = (temp == null) ? new Array() : JSON.parse(temp);
+        if (!temp || temp.length == 0) {
+            // si on n'a pas accès à la firebase, on regarde les communes disponibles en local
+            databaseService.getAllCommunes(
+                (communes) => {
+                    temp = communes ?? new Array();
+                    
+                    // attribution des communes aux bonnes variables
+                    setAllDataSource(temp);
+                    setFilteredDataSource(temp);
+                },
+                (errorMessage) => {
+                    console.error(errorMessage);
+                }
+            );
         }
 
-        // attribution des communes aux bonnes variables
-        setAllDataSource(temp);
-        setFilteredDataSource(temp);
     }
 
     // recharge les communes quand la connectivité internet change
     useEffect(() => {
         chargeCommunes();
     }, [internetAvailable])
-
-
 
     // wrapper du component dans une fonction
     return <SearchCommune {...props}

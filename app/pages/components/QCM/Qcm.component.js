@@ -1,81 +1,118 @@
 import React, { Component } from 'react';
 import { View, Text, Image, TouchableOpacity, BackHandler, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import styles from './Qcm.component.style.js'
+import { Audio } from 'expo-av';
+import styles from './Qcm.component.style.js';
 import TopBarre from './../../../components/TopBarre/TopBarre.component';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MainTitle from './../../../components/MainTitle/MainTitle.component';
-import {getParcoursContents} from "../../../utils/queries";
-
+import * as FileSystem from 'expo-file-system';
 
 class Qcm extends Component {
-
     constructor(props) {
         super(props);
         this.handleBackButtonClick = this.handleBackButtonClick.bind(this);
         this.state = {
             confirmClicked: false,
-            communesData: null
+            audio: null, // State variable to hold the sound object
         };
     }
 
     componentDidMount() {
-        const { parcours } = this.props;
-        const size = parcours.length;
-        console.log(parcours[size-1].parcoursId)
         BackHandler.addEventListener('hardwareBackPress', this.handleBackButtonClick);
-        this.fetchCommunesData(parcours[size-1].parcoursId)
-            .then(communesData => {
-                this.setState({ communesData });
-            })
-            .catch(error => {
-                console.error('Error fetching communes data:', error);
-            });
+        this.loadAudio();
     }
-    fetchCommunesData(id) {
-        return getParcoursContents(id)
-            .then(communesData => {
-                return communesData.general;
-            })
-            .catch(error => {
-                console.error('Error fetching communes data:', error);
-                return null; // or some default value if an error occurs
-            });
-    }
+    
     componentWillUnmount() {
         BackHandler.removeEventListener('hardwareBackPress', this.handleBackButtonClick);
+        const { audio } = this.state;
+        if (audio) {
+            audio.unloadAsync();
+            const fileUri = FileSystem.documentDirectory + 'temp_audio.mp3';
+            FileSystem.deleteAsync(fileUri).catch(error => console.warn('Error deleting temporary audio file :', error.message));
+        }
     }
+
+    async loadAudio() {
+        const audioURL = this.props.currentGame.audio_url;
+        if (audioURL && audioURL !== '') {
+            const { audio } = this.state;
+            if (audio) {
+                await audio.unloadAsync();
+            }
+
+            // Write the base64 string to a temporary file
+            const fileUri = FileSystem.documentDirectory + 'temp_audio.mp3';
+            await FileSystem.writeAsStringAsync(fileUri, audioURL, {
+                encoding: FileSystem.EncodingType.Base64,
+            });
+
+           // Load the audio
+            const newAudio = await Audio.Sound.createAsync(
+                { uri: fileUri },
+                { shouldPlay: false }
+            );
+            this.setState({ audio: newAudio.sound });
+        }
+    }
+
+    async playSound() {
+        const { audio } = this.state;
+        if (audio) {
+            console.log("playing audio");
+            await audio.playAsync();
+        }
+    }
+    
     handleBackButtonClick() {
         return true;
     }
 
-    currentGame = this.props.currentGame;
-    handleConfirmClicked = () => {
+    async playSound() {
+        const { sound } = this.state;
+        if (sound) {
+            await sound.unloadAsync();
+        }
+        const { currentGame } = this.props;
+        if (currentGame.audio) {
+            const { sound } = await Audio.Sound.createAsync(
+                { uri: currentGame.audio }
+            );
+            this.setState({ sound });
+            await sound.playAsync();
+        }
+    }
+
+    handleConfirmClicked = async () => {
         if (!this.state.confirmClicked) {
             this.setState({ confirmClicked: true });
         }
     }
 
     render() {
-        const { communesData } = this.state;
-        const paragraph = this.props.currentGame.texte;
-        const maxEtape = communesData ?? "-";
-        if (maxEtape.max_etape === undefined)
-            var TopBarreName = "";
-        else
-            var TopBarreName = "Etape : " + this.props.currentGame.n_etape + "/" + maxEtape.max_etape;
-        const title = this.currentGame.nom
+        const etapeMax = this.props.parcoursInfo.etape_max;
+        if (etapeMax === undefined) {
+            var topBarreName = "";
+        } else {
+            var topBarreName = "Étape : " + this.props.currentGame.n_etape + "/" + etapeMax;
+        }
+        const title = this.props.currentGame.nom
         const icone = require('./../../../assets/qcm_icone.png');
         const illustration = this.props.currentGame.image_url;
         return (
             <SafeAreaView style={styles.outsideSafeArea}>
-                <TopBarre name={TopBarreName} />
+                <TopBarre name={topBarreName} />
                 <View style={styles.globalContainer}>
                     <ScrollView contentContainerStyle={styles.scrollViewContainer} style={styles.scrollView}>
                         <View style={styles.card}>
                             <MainTitle title={title} icone={icone} />
-                            {(illustration != '') && (<Image source={{ uri: illustration }} style={styles.areaImage} />)}
-                            <Text style={styles.description} > {this.currentGame.question} </Text>
+                            {illustration != '' && <Image source={{ uri: illustration }} style={styles.areaImage} />}
+                            <Text style={styles.description}>{this.props.currentGame.question}</Text>
+                            {this.props.currentGame.audio_url && (
+                                <TouchableOpacity style={styles.audioButton} onPress={() => this.playSound()}>
+                                    <Text style={styles.audioButtonText}>🔊</Text>
+                                </TouchableOpacity>
+                            )}
                             <View style={styles.gameZone}>
                                 <View style={styles.rowFlex}>
                                     <TouchableOpacity style={styles.bouton}
@@ -83,24 +120,24 @@ class Qcm extends Component {
                                         onPress={() => {
                                             this.handleConfirmClicked();
                                             var win = 0;
-                                            if (this.currentGame.index_bonneReponse == 0) {
+                                            if (this.props.currentGame.index_bonneReponse == 0) {
                                                 win = 1;
                                             }
-                                            this.props.navigation.navigate("GameOutcomePage", { parcours: this.props.parcours, currentGame: this.props.currentGame, win: win });
+                                            this.props.navigation.navigate("GameOutcomePage", { parcoursInfo: this.props.parcoursInfo, parcours: this.props.parcours, currentGame: this.props.currentGame, win: win });
                                         }}>
-                                        <Text adjustsFontSizeToFit={true} style={styles.boutonText}> {this.currentGame.reponses_tab[0]} </Text>
+                                        <Text adjustsFontSizeToFit={true} style={styles.boutonText}> {this.props.currentGame.reponses_tab[0]} </Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity style={styles.bouton}
                                         disabled={this.state.confirmClicked}
                                         onPress={() => {
                                             this.handleConfirmClicked();
                                             var win = 0;
-                                            if (this.currentGame.index_bonneReponse == 1) {
+                                            if (this.props.currentGame.index_bonneReponse == 1) {
                                                 win = 1;
                                             }
-                                            this.props.navigation.navigate("GameOutcomePage", { parcours: this.props.parcours, currentGame: this.props.currentGame, win: win });
+                                            this.props.navigation.navigate("GameOutcomePage", { parcoursInfo: this.props.parcoursInfo, parcours: this.props.parcours, currentGame: this.props.currentGame, win: win });
                                         }}>
-                                        <Text adjustsFontSizeToFit={true} style={styles.boutonText}> {this.currentGame.reponses_tab[1]} </Text>
+                                        <Text adjustsFontSizeToFit={true} style={styles.boutonText}> {this.props.currentGame.reponses_tab[1]} </Text>
                                     </TouchableOpacity>
                                 </View>
 
@@ -110,12 +147,12 @@ class Qcm extends Component {
                                         onPress={() => {
                                             this.handleConfirmClicked();
                                             var win = 0;
-                                            if (this.currentGame.index_bonneReponse == 2) {
+                                            if (this.props.currentGame.index_bonneReponse == 2) {
                                                 win = 1;
                                             }
-                                            this.props.navigation.navigate("GameOutcomePage", { parcours: this.props.parcours, currentGame: this.props.currentGame, win: win });
+                                            this.props.navigation.navigate("GameOutcomePage", { parcoursInfo: this.props.parcoursInfo, parcours: this.props.parcours, currentGame: this.props.currentGame, win: win });
                                         }}>
-                                        <Text adjustsFontSizeToFit={true} style={styles.boutonText}> {this.currentGame.reponses_tab[2]} </Text>
+                                        <Text adjustsFontSizeToFit={true} style={styles.boutonText}> {this.props.currentGame.reponses_tab[2]} </Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity style={styles.bouton}
@@ -123,12 +160,12 @@ class Qcm extends Component {
                                         onPress={() => {
                                             this.handleConfirmClicked();
                                             var win = 0;
-                                            if (this.currentGame.index_bonneReponse == 3) {
+                                            if (this.props.currentGame.index_bonneReponse == 3) {
                                                 win = 1;
                                             }
-                                            this.props.navigation.navigate("GameOutcomePage", { parcours: this.props.parcours, currentGame: this.props.currentGame, win: win });
+                                            this.props.navigation.navigate("GameOutcomePage", { parcoursInfo: this.props.parcoursInfo, parcours: this.props.parcours, currentGame: this.props.currentGame, win: win });
                                         }}>
-                                        <Text adjustsFontSizeToFit={true} style={styles.boutonText}> {this.currentGame.reponses_tab[3]} </Text>
+                                        <Text adjustsFontSizeToFit={true} style={styles.boutonText}> {this.props.currentGame.reponses_tab[3]} </Text>
                                     </TouchableOpacity>
                                 </View>
                             </View>

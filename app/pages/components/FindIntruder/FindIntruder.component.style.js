@@ -63,6 +63,11 @@ export default StyleSheet.create({
 		fontWeight: theme.FONT_WEIGHT_LIGHT,
 		textAlign: 'justify',
         maxWidth: '100%', // Empêche la légende de dépasser le bouton
+    },
+    audioButton: {
+        ...common.audioButton,
+    },
+    audioButtonText: {
+        ...common.audioButtonText,
     }
-
 })

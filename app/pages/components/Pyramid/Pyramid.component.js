@@ -7,7 +7,8 @@ import generateValues from './generateValues';
 import CircleLine from './CircleLine'
 import { SafeAreaView } from 'react-native-safe-area-context';
 import MainTitle from './../../../components/MainTitle/MainTitle.component';
-import {getParcoursContents} from "../../../utils/queries";
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
 
 
 /**
@@ -18,38 +19,59 @@ class Pyramid extends Component {
         super(props);
         this.state = {
             lastCircleValue: '',
-            communesData: null};
-        // initialise les valeurs des premiers cercles avec la fonction generateValues
-        this.state = { s: generateValues(this.props.currentGame.nombre), confirmClicked: false };
+            audio: null,
+            confirmClicked: false,
+            s: generateValues(this.props.currentGame.nombre) // initialise les valeurs des premiers cercles avec la fonction generateValues
+        };
         this.handleBackButtonClick = this.handleBackButtonClick.bind(this);
     }
 
     componentDidMount() {
-        const { parcours } = this.props;
-        const size = parcours.length;
-        console.log(parcours[size-1].parcoursId)
         BackHandler.addEventListener('hardwareBackPress', this.handleBackButtonClick);
-        this.fetchCommunesData(parcours[size-1].parcoursId)
-            .then(communesData => {
-                this.setState({ communesData });
-            })
-            .catch(error => {
-                console.error('Error fetching communes data:', error);
-            });
+        this.loadAudio();
     }
-    fetchCommunesData(id) {
-        return getParcoursContents(id)
-            .then(communesData => {
-                return communesData.general;
-            })
-            .catch(error => {
-                console.error('Error fetching communes data:', error);
-                return null; // or some default value if an error occurs
-            });
-    }
+    
     componentWillUnmount() {
         BackHandler.removeEventListener('hardwareBackPress', this.handleBackButtonClick);
+        const { audio } = this.state;
+        if (audio) {
+            audio.unloadAsync();
+            const fileUri = FileSystem.documentDirectory + 'temp_audio.mp3';
+            FileSystem.deleteAsync(fileUri).catch(error => console.warn('Error deleting temporary audio file :', error.message));
+        }
     }
+
+    async loadAudio() {
+        const audioURL = this.props.currentGame.audio_url;
+        if (audioURL && audioURL !== '') {
+            const { audio } = this.state;
+            if (audio) {
+                await audio.unloadAsync();
+            }
+
+            // Write the base64 string to a temporary file
+            const fileUri = FileSystem.documentDirectory + 'temp_audio.mp3';
+            await FileSystem.writeAsStringAsync(fileUri, audioURL, {
+                encoding: FileSystem.EncodingType.Base64,
+            });
+
+           // Load the audio
+            const newAudio = await Audio.Sound.createAsync(
+                { uri: fileUri },
+                { shouldPlay: false }
+            );
+            this.setState({ audio: newAudio.sound });
+        }
+    }
+
+    async playSound() {
+        const { audio } = this.state;
+        if (audio) {
+            console.log("playing audio");
+            await audio.playAsync();
+        }
+    }
+    
     handleBackButtonClick() {
         return true;
     }
@@ -62,32 +84,37 @@ class Pyramid extends Component {
 
     handleInputTextChange = (input) => this.setState({ lastCircleValue: input })
 
-  render() {
-    const question = this.props.currentGame.question;
-    const title = this.props.currentGame.nom;
-    const result = this.props.currentGame.nombre;
-    const illustration = this.props.currentGame.image_url;
-    const { communesData } = this.state;
-    const maxEtape = communesData ?? "-";
-    if (maxEtape.max_etape === undefined)
-      var TopBarreName = "";
-    else
-      var TopBarreName = "Etape : " + this.props.currentGame.n_etape + "/" + maxEtape.max_etape;
-    const textRegles = "Règle : Remplir la pyramide jusqu'en bas selon le principe suivant : chaque case vide doit contenir la somme des deux cases qui se trouvent au-dessus"
-    const icone = require('./../../../assets/calcul_pyramidal_icone.png');
+    render() {
+        const question = this.props.currentGame.question;
+        const title = this.props.currentGame.nom;
+        const result = this.props.currentGame.nombre;
+        const illustration = this.props.currentGame.image_url;
+        const etapeMax = this.props.parcoursInfo.etape_max;
+        if (etapeMax === undefined) {
+            var topBarreName = "";
+        } else {
+            var topBarreName = "Étape : " + this.props.currentGame.n_etape + "/" + etapeMax;
+        }
+        const textRegles = "Remplir la pyramide jusqu'en bas selon le principe suivant : chaque case vide doit contenir la somme des deux cases qui se trouvent au-dessus"
+        const icone = require('./../../../assets/calcul_pyramidal_icone.png');
 
         return (
             <SafeAreaView style={styles.outsideSafeArea}>
-                <TopBarre name={TopBarreName} />
+                <TopBarre name={topBarreName} />
                 <View style={styles.globalContainer}>
                     <ScrollView contentContainerStyle={styles.scrollViewContainer} style={styles.scrollView}>
                         <View style={styles.card}>
 
                             <MainTitle title={title} icone={icone} />
-                            {(illustration != '') && (<Image source={{ uri: illustration }} style={styles.areaImage} />)}
+                            {(illustration !== '') && (<Image source={{ uri: illustration }} style={styles.areaImage} />)}
                             <Text style={styles.description}>{textRegles}</Text>
                             <Text style={styles.description}>{question}</Text>
 
+                            {this.props.currentGame.audio_url && (
+                                <TouchableOpacity style={styles.audioButton} onPress={() => this.playSound()}>
+                                    <Text style={styles.audioButtonText}>🔊</Text>
+                                </TouchableOpacity>
+                            )}
 
                             <View style={styles.gameArea}>
 
@@ -95,10 +122,8 @@ class Pyramid extends Component {
                                 <CircleLine count={3} edit={true} preFill={false} />
                                 <CircleLine count={2} edit={true} preFill={false} />
                                 <CircleLine count={1} edit={true} onChangeText={this.handleInputTextChange} value={this.state.lastCircleValue} preFill={false} />
-
-                            </View>
-
-
+                            
+			                </View>
                         </View>
                         <View style={styles.rightAlign}>
                             <TouchableOpacity style={styles.bouton}
@@ -115,27 +140,24 @@ class Pyramid extends Component {
                                     if (Math.trunc(newResult) == 0) {
                                         newResult = newResult * 10;
                                     }
-                                    if (parseInt(this.state.lastCircleValue) == newResult) {
+                                    if (parseInt(this.state.lastCircleValue) === newResult) {
                                         win = 1;
                                     }
-                                    this.props.navigation.navigate("GameOutcomePage", { parcours: this.props.parcours, currentGame: this.props.currentGame, win: win });
-                                }}>
-                                <Text style={styles.boutonText}> {"Valider"} </Text>
-                            </TouchableOpacity>
-                        </View>
-                        <View>
 
+                                    // Navigate to the outcome page
+                                    this.props.navigation.navigate("GameOutcomePage", { parcoursInfo: this.props.parcoursInfo, parcours: this.props.parcours, currentGame: this.props.currentGame, win: win });
+                                }}>
+                                <Text style={styles.boutonText}>Valider</Text>
+                            </TouchableOpacity>
                         </View>
                     </ScrollView>
                 </View>
             </SafeAreaView>
         );
     }
-
 }
 
 export default function (props) {
     const navigation = useNavigation();
     return <Pyramid {...props} navigation={navigation} />
 }
-
