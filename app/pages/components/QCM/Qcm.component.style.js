@@ -49,5 +49,11 @@ export default StyleSheet.create({
     scrollView: {
         ...common.scrollView
     },
+    audioButton: {
+        ...common.audioButton,
+    },
+    audioButtonText: {
+        ...common.audioButtonText,
+    }
 
 })

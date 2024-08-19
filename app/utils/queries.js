@@ -1,30 +1,35 @@
 import { db } from '../config/firebaseConfig';
 import { collection, getDocs, getDoc, doc, query, where } from "firebase/firestore";
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Alert } from 'react-native';
 
 //Return commune names in an array that match with 'cityName'
 export async function searchAndGetCommunes(cityName) {
-	const communes = [];
+  const communes = [];
 
-	// Get collection reference
-	const communeCollectionRef = collection(db, 'commune');
+  try {
+    // Get collection reference
+    const communeCollectionRef = collection(db, 'commune');
 
-	// Create query (filter)
-	const q = query(communeCollectionRef, where("nom", "==", cityName));
+    // Create query (filter)
+    const q = query(communeCollectionRef, where("nom", "==", cityName));
 
-	const querySnapshot = await getDocs(q);
-	querySnapshot.forEach((doc) => {
-		co = {
-			nom: doc.data().nom,
-			code_postal: doc.data().code_postal
-		}
-		communes.push(co);
-	});
-	return communes;
+    // Execute query
+    const querySnapshot = await getDocs(q);
+    querySnapshot.forEach((doc) => {
+      const commune = {
+        nom: doc.data().nom,
+        code_postal: doc.data().code_postal
+      };
+      communes.push(commune);
+    });
+  } catch (error) {
+    console.error("Error fetching communes:", error);
+  }
+
+  return communes;
 }
 
-// Return all communes which exist in database
+// Return all communes that exist in database
 export async function getAllCommunes() {
 	const communes = [];
 	const res = await getDocs(collection(db, "commune"));
@@ -35,10 +40,10 @@ export async function getAllCommunes() {
 	return communes;
 }
 
-// Return all parcours from the commune given in argument
-// Input : Commune name (string)
-// Output : Parcours { titre, description, commune } (object)
-export async function getParcoursFromCommune(cityName) {
+// Return all circuits from the given city
+// Input : City name (string)
+// Output : Circuits { titre, description, commune } (object)
+export async function getParcoursFromCommune(cityName, id = "") {
 
 	let blocked = false;
 	if (await checkQueryQuota(40, 50) == "block") {
@@ -46,30 +51,50 @@ export async function getParcoursFromCommune(cityName) {
 	}
 	const parcours = [];
 
-	// Get collection reference
-	const parcoursCollectionRef = collection(db, 'parcours');
+	let q;
+	if (id === "") {
+		// Get collection reference
+		const parcoursCollectionRef = collection(db, 'parcours');
 
-	// Create query (filter)
-	const q = query(parcoursCollectionRef, where("commune", "==", cityName), where("brouillon", "==", false));
+		// Create query (filter)
+		q = query(parcoursCollectionRef, where("commune", "==", cityName), where("brouillon", "==", false));
 
-	const querySnapshot = await getDocs(q);
-	await Promise.all(querySnapshot.docs.map(async (doc) => {
+		const querySnapshot = await getDocs(q);
+		await Promise.all(querySnapshot.docs.map(async (doc) => {
+			let image_url = ""
+			if (!blocked) {
+				image_url = (doc.data().image_url) == "" ? doc.data().image_url : await getDataURLFromURL(doc.data().image_url);
+			}
+			const temp = {
+				identifiant: doc.id,
+				titre: doc.data().titre,
+				description: doc.data().description,
+				commune: doc.data().commune,
+				duree: doc.data().duree,
+				difficulte: doc.data().difficulte,
+				image_url: image_url,
+				etape_max: doc.data().etape_max
+			}
+			parcours.push(temp);
+		}));
+	} else {
+		const snapShotDoc = await getDoc(doc(db, "parcours", id));
 		let image_url = ""
 		if (!blocked) {
-			image_url = (doc.data().image_url) == "" ? doc.data().image_url : await getDataURLFromURL(doc.data().image_url);
+			image_url = (snapShotDoc.data().image_url) == "" ? snapShotDoc.data().image_url : await getDataURLFromURL(snapShotDoc.data().image_url);
 		}
-		const pa = {
-			identifiant: doc.id,
-			titre: doc.data().titre,
-			description: doc.data().description,
-			commune: doc.data().commune,
-			duree: doc.data().duree,
-			difficulte: doc.data().difficulte,
+		const temp = {
+			identifiant: snapShotDoc.id,
+			titre: snapShotDoc.data().titre,
+			description: snapShotDoc.data().description,
+			commune: snapShotDoc.data().commune,
+			duree: snapShotDoc.data().duree,
+			difficulte: snapShotDoc.data().difficulte,
 			image_url: image_url,
-			etape_max: doc.data().etape_max
+			etape_max: snapShotDoc.data().etape_max
 		}
-		parcours.push(pa);
-	}));
+		parcours.push(temp);
+	}
 	return parcours;
 }
 
@@ -86,81 +111,108 @@ export async function getParcoursFromCommune(cityName) {
 //      { id_etape: '0uXCxTBra7nBKQzc6jfB', etape : [Object (variable)] }, { id_etape: "Vv87ssNMTcsel1ytMUVU", etape : [Object (variable)] }, ...
 //   ]
 // }
-// If the parcours doesnt exist : Output : {}
+// If the parcours does not exist : Output : {}
 export async function getParcoursContents(id) {
-
-	if (await checkQueryQuota(40, 50) == "block") {
-		return {};
-	}
-
-	const docRefParcours = doc(db, "parcours", id);
-	const docSnap = await getDoc(docRefParcours);
-	const pathSubColEtape = "/parcours/" + docSnap.id + "/etape";
-	const res = {};
-
-	if (docSnap.exists()) {
-
-		// Get general parcours info
-		const generalInfo = {
-			commune: docSnap.data().commune,
-			titre: docSnap.data().titre,
-			description: docSnap.data().description,
-			max_etape: docSnap.data().etape_max
+	try {
+		if (await checkQueryQuota(40, 50) == "block") {
+			return {};
 		}
 
-		res.general = generalInfo;
+		const docRefParcours = doc(db, "parcours", id);
+		const docSnap = await getDoc(docRefParcours);
+		const pathSubColEtape = "/parcours/" + id + "/etape";
+		const docRefCommune = doc(db, "commune", docSnap.data().commune.toLowerCase());
+		const communeDocSnap = await getDoc(docRefCommune);
+		const res = {};
 
-		// Get all docs at pathSubColEtape
-		const querySnapshot = await getDocs(collection(db, pathSubColEtape));
-		const subColRes = [];
+		if (docSnap.exists() && communeDocSnap.exists()) {
 
-		// Iterate through the documents fetched
-		await Promise.all(querySnapshot.docs.map(async (queryDocumentSnapshot) => {
+			// Get postal code
+			res.code_postal = communeDocSnap.data().code_postal;
 
-			var etapeInfo =
-			{
-				id_etape: queryDocumentSnapshot.id,
-				etape: queryDocumentSnapshot.data()
-			}
-			if (etapeInfo.etape.image_url != null && etapeInfo.etape.image_url != "") {
-				etapeInfo.etape.image_url = await getDataURLFromURL(etapeInfo.etape.image_url);
-			}
-			if (etapeInfo.etape.images_tab != null) {
-				for (var i = 0; i < etapeInfo.etape.images_tab.length; i++) {
-					etapeInfo.etape.images_tab[i] = await getDataURLFromURL(etapeInfo.etape.images_tab[i]);
+			// Get all docs at pathSubColEtape
+			const querySnapshot = await getDocs(collection(db, pathSubColEtape));
+			const subColRes = [];
+
+			// Iterate through the documents fetched
+			await Promise.all(querySnapshot.docs.map(async (queryDocumentSnapshot) => {
+
+				var etapeInfo = {
+					id_etape: queryDocumentSnapshot.id,
+					etape: queryDocumentSnapshot.data()
 				}
-			}
+				if (etapeInfo.etape.image_url && etapeInfo.etape.image_url != "") {
+					etapeInfo.etape.image_url = await getDataURLFromURL(etapeInfo.etape.image_url);
+				}
+				if (etapeInfo.etape.audio_url && etapeInfo.etape.audio_url != "") {
+					etapeInfo.etape.audio_url = await getAudioDataURLFromURL(etapeInfo.etape.audio_url);
+				}
+				if (etapeInfo.etape.images_tab) {
+					for (var i = 0; i < etapeInfo.etape.images_tab.length; i++) {
+						etapeInfo.etape.images_tab[i] = await getDataURLFromURL(etapeInfo.etape.images_tab[i]);
+					}
+				}
 
-			subColRes.push(etapeInfo);
-		}))
+				subColRes.push(etapeInfo);
+			}))
 
-		res.etapes = subColRes;
+			res.etapes = subColRes;
+			
+		} else {
+			// docSnap.data() will be undefined in this case
+			console.log("No such document !");
+		}
 
 		return res;
-	} else {
-		// docSnap.data() will be undefined in this case
-		console.log("No such document!");
-	}
 
-	return res;
+	} catch (error) {
+		console.error("Error getting parcours contents: ", error);
+		return { error: "An error occurred while fetching parcours contents." };
+	}
+}
+
+async function getAudioDataURLFromURL(url) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch resource: ${response.status} ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+				const dataUrl = reader.result;
+                const base64Data = dataUrl.split(',')[1]; // Remove prefix to keep the data only
+				resolve(base64Data);
+			}
+            reader.onerror = () => reject(new Error("Failed to read Blob as Data URL"));
+            reader.readAsDataURL(blob);
+        });
+    } catch (error) {
+        console.error("Error in getDataURLFromURL:", error);
+        throw error;
+    }
 }
 
 async function getDataURLFromURL(url) {
-	return new Promise(function (resolve, reject) {
-		const xhr = new XMLHttpRequest();
-		xhr.responseType = 'blob';
-		xhr.onload = (event) => {
-			const blob = xhr.response;
-			var reader = new FileReader();
-			reader.readAsDataURL(blob);
-			reader.onloadend = function () {
-				let res = reader.result;
-				resolve(res);
-			}
-		};
-		xhr.open('GET', url);
-		xhr.send();
-	})
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch resource: ${response.status} ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        return await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = () => reject(new Error("Failed to read Blob as Data URL"));
+            reader.readAsDataURL(blob);
+        });
+    } catch (error) {
+        console.error("Error in getDataURLFromURL:", error);
+        throw error;
+    }
 }
 
 /**
@@ -191,7 +243,7 @@ async function checkQueryQuota(warningLimit, blockLimit) {
 		return "ok";
 	}
 
-	// dépassage de la limite du jour, blockage des requêtes
+	// dépassement de la limite du jour, blockage des requêtes
 	// if (parseInt(nbCalls) >= blockLimit) {
 	//   Alert.alert("Vous avez utilisé vos " + blockLimit + " téléchargements d'aujourd'hui.");
 	//   console.log("query " + 10);
@@ -209,3 +261,32 @@ async function checkQueryQuota(warningLimit, blockLimit) {
 	// }
 	return "ok";
 }
+
+//Fonction pour la carte
+
+export async function getParcoursDonne() {
+	const parcoursCollectionRef = collection(db, 'parcours');
+	const q = query(parcoursCollectionRef, where('brouillon', '==', false)); // Add condition to filter 'brouillon' as false
+	const querySnapshot = await getDocs(q);
+  
+	const parcoursDonne = [];
+	querySnapshot.forEach(doc => {
+	  const data = doc.data();
+	  if (data.gps) { // Check if gps exists
+		const { latitude, longitude } = data.gps;
+		parcoursDonne.push({
+		  identifiant: doc.id,
+		  commune: data.commune,
+		  latitude: latitude,
+		  longitude: longitude,
+		  titre: data.titre,
+		  difficulte: data.difficulte,
+		  duree: data.duree
+		});
+	  } else {
+		console.warn(`No GPS data for document ${doc.id}`);
+	  }
+	});
+  
+	return parcoursDonne;
+  }
