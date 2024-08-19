@@ -38,4 +38,10 @@ export default StyleSheet.create({
     outsideSafeArea: {
         ...common.outsideSafeArea,
     },
+    audioButton: {
+        ...common.audioButton,
+    },
+    audioButtonText: {
+        ...common.audioButtonText,
+    }
 });

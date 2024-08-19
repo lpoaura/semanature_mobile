@@ -8,6 +8,7 @@ export default StyleSheet.create({
 		margin: 10,
 		borderRadius: 30,
 		backgroundColor: theme.PRIMARY_COLOR,
+		alignItems: 'center',
 	},
 
 	boutonText: {
@@ -15,6 +16,10 @@ export default StyleSheet.create({
 		textAlign: 'center',
 		fontSize: theme.FONT_SIZE_LARGE,
 		fontWeight: theme.FONT_WEIGHT_BOLD,
+	},
+
+	activityIndicator: {
+		color: theme.PRIMARY_COLOR,
 	},
 
 	areaImage: {
@@ -30,9 +35,10 @@ export default StyleSheet.create({
 		color: '#000000',
 		fontSize: theme.FONT_SIZE_LARGE,
 		fontWeight: theme.FONT_WEIGHT_BOLD,
-		textAlign: 'justify',
 		padding: 10,
-		margin: 10,
+		marginHorizontal: 10,
+		marginBottom: 15,
+		marginTop: 5,
 	},
 
 	MainTitle: {
@@ -50,33 +56,27 @@ export default StyleSheet.create({
 		fontWeight: theme.FONT_WEIGHT_LIGHT,
 		padding: 5,
 		margin: 5,
-		textAlign: 'justify',
+		textAlign: 'left',
 	},
 
 	card: {
-		paddingVertical: theme.CONTAINER_PADDING,
 		backgroundColor: theme.LIGHT_GRAY_COLOR,
-		minWidth: '90%',
-		maxWidth: '90%',
+		width: '95%',
 		borderRadius: 30,
-		margin: 10,
+		marginVertical: 5,
 		padding: 10,
-		paddingBottom: 30,
 		justifyContent: 'space-between',
 		alignItems: 'flex-start',
-		flex: -1,
-
+		alignSelf: 'center',
 	},
 
 	cardBegin: {
 		paddingVertical: theme.CONTAINER_PADDING,
 		backgroundColor: theme.LIGHT_GRAY_COLOR,
-		minWidth: '90%',
-		maxWidth: '90%',
+		width: '90%',
 		borderRadius: 30,
-		margin: 10,
+		marginVertical: 20,
 		padding: 10,
-		paddingBottom: 30,
 		justifyContent: 'space-between',
 		alignItems: 'center',
 		flex: -1,
@@ -149,5 +149,20 @@ export default StyleSheet.create({
 		alignItems: 'center',
 	},
 
+	parcoursCardList: {
+        minWidth: '100%',
+	},
+
+	audioButton: {
+        marginTop: 10,
+        padding: 10,
+        backgroundColor: '#ddd',
+        borderRadius: 20,
+        alignItems: 'center',
+	},
+	
+    audioButtonText: {
+        fontSize: 20,
+    }
 
 });

@@ -3,7 +3,7 @@ import { View, Text, Image } from 'react-native';
 import styles from './TopBarre.component.style'
 
 /**
- * Créer une barre en haut de la page pour afficher le nom de la page, passé en paramètre, ainsi que les icones de la LPO et SEM métropole
+ * Crée une barre en haut de la page pour afficher le nom de la page, passé en paramètre, ainsi que l'icône de la LPO
  */
 class TopBarre extends Component {
 	constructor(props) {
@@ -12,7 +12,7 @@ class TopBarre extends Component {
 	render() {
 		const PlaceholderImage = require('./../../assets/logo_LPO.png');
 		const PlaceholderLogoSEM = require('./../../assets/logo_SM.png');
-		const { name } = this.props
+		const { name } = this.props;
 		return (
 			<View style={styles.barreContainer}>
 				<Image source={PlaceholderImage} style={styles.icone} />
@@ -20,10 +20,6 @@ class TopBarre extends Component {
 				<Text style={styles.text}>
 					{name}
 				</Text>
-
-				<View style={styles.imageContainer}>
-					<Image source={PlaceholderLogoSEM} style={styles.icone} />
-				</View>
 			</View>
 		);
 	}

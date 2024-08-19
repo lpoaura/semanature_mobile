@@ -1,78 +1,99 @@
-import React, { Component, useEffect } from 'react';
-import { View, Text, Image, BackHandler, ScrollView } from 'react-native';
-import styles from './Joke.component.style';
+import React, { Component } from 'react';
+import { View, Text, Image, BackHandler, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Audio } from 'expo-av';
+import styles from './Joke.component.style';
 import MainTitle from './../../../components/MainTitle/MainTitle.component';
 import TopBarre from './../../../components/TopBarre/TopBarre.component';
 import NextPage from './../../components/NextPage/NextPage.component';
-import {getParcoursContents} from "../../../utils/queries";
+import * as FileSystem from 'expo-file-system';
 
 class JokePage extends Component {
     constructor(props) {
         super(props);
-        this.state = {
-            communesData: null,
-        };
         this.handleBackButtonClick = this.handleBackButtonClick.bind(this);
+        this.state = {
+            audio: null
+        };
     }
 
-    // empêche le retour en arrière
     componentDidMount() {
-        const { parcours } = this.props;
-        const size = parcours.length;
-        console.log(parcours[size-1].parcoursId)
         BackHandler.addEventListener('hardwareBackPress', this.handleBackButtonClick);
-        this.fetchCommunesData(parcours[size-1].parcoursId)
-            .then(communesData => {
-                this.setState({ communesData });
-            })
-            .catch(error => {
-                console.error('Error fetching communes data:', error);
-            });
+        this.loadAudio();
     }
-    fetchCommunesData(id) {
-        return getParcoursContents(id)
-            .then(communesData => {
-                return communesData.general;
-            })
-            .catch(error => {
-                console.error('Error fetching communes data:', error);
-                return null; // or some default value if an error occurs
-            });
-    }
+    
     componentWillUnmount() {
         BackHandler.removeEventListener('hardwareBackPress', this.handleBackButtonClick);
+        const { audio } = this.state;
+        if (audio) {
+            audio.unloadAsync();
+            const fileUri = FileSystem.documentDirectory + 'temp_audio.mp3';
+            FileSystem.deleteAsync(fileUri).catch(error => console.warn('Error deleting temporary audio file :', error.message));
+        }
     }
+    
     handleBackButtonClick() {
         return true;
     }
 
+    async loadAudio() {
+        const audioURL = this.props.currentGame.audio_url;
+        if (audioURL && audioURL !== '') {
+            const { audio } = this.state;
+            if (audio) {
+                await audio.unloadAsync();
+            }
+
+            // Write the base64 string to a temporary file
+            const fileUri = FileSystem.documentDirectory + 'temp_audio.mp3';
+            await FileSystem.writeAsStringAsync(fileUri, audioURL, {
+                encoding: FileSystem.EncodingType.Base64,
+            });
+
+           // Load the audio
+            const newAudio = await Audio.Sound.createAsync(
+                { uri: fileUri },
+                { shouldPlay: false }
+            );
+            this.setState({ audio: newAudio.sound });
+        }
+    }
+
+    async playSound() {
+        const { audio } = this.state;
+        if (audio) {
+            console.log("playing audio");
+            await audio.playAsync();
+        }
+    }
+
     render() {
-        const { communesData } = this.state;
-        const maxEtape = communesData ?? "-";
-        if (maxEtape.max_etape === undefined)
-            var TopBarreName = "";
-        else
-            var TopBarreName = "Etape : " + this.props.currentGame.n_etape + "/" + maxEtape.max_etape;
-        // données à afficher
-        const paragraph = this.props.currentGame.texte;
-        const title = this.props.currentGame.nom;
-        const illustration = this.props.currentGame.image_url;
+        const { currentGame, parcoursInfo, parcours } = this.props;
+        const etapeMax = parcoursInfo.etape_max;
+        const topBarreName = etapeMax === undefined ? "" : `Étape : ${currentGame.n_etape}/${etapeMax}`;
+        const paragraph = currentGame.texte;
+        const title = currentGame.nom;
+        const illustration = currentGame.image_url;
         const icone = require('./../../../assets/blague_icone.png');
-        // affichage
+
         return (
             <SafeAreaView style={styles.outsideSafeArea}>
-                <TopBarre name={TopBarreName} />
+                <TopBarre name={topBarreName} />
                 <View style={styles.globalContainer}>
                     <ScrollView contentContainerStyle={styles.scrollViewContainer} style={styles.scrollView}>
                         <View style={styles.card}>
                             <MainTitle title={title} icone={icone} />
-                            {(illustration != '') && (<Image source={{ uri: illustration }} style={styles.areaImage} />)}
-                            <Text style={styles.description}> {paragraph} </Text>
+                            {illustration !== '' && <Image source={{ uri: illustration }} style={styles.areaImage} />}
+                            <Text style={styles.description}>{paragraph}</Text>
+                            {currentGame.audio_url && (
+                                <TouchableOpacity style={styles.audioButton} onPress={() => this.playSound()}>
+                                    <Text style={styles.audioButtonText}>🔊</Text>
+                                </TouchableOpacity>
+                            )}
                         </View>
                         <NextPage
                             pageName="GamePage"
-                            parameters={{ parcours: this.props.parcours }}
+                            parameters={{ parcoursInfo: parcoursInfo, parcours: parcours }}
                         />
                     </ScrollView>
                 </View>
@@ -81,7 +102,6 @@ class JokePage extends Component {
     }
 }
 
-// wrapper du component dans une fonction
 export default function (props) {
     return <JokePage {...props} />
 }
