@@ -19,3 +19,8 @@ package-lock.json
 .metro-health-check*
 
 comptes.*
+
+# python
+.venv
+venv
+*.pyc
