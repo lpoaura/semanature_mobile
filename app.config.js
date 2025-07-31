@@ -13,7 +13,7 @@ export default ({ config }) => {
       firebaseDefaultUserEmail: process.env.DEFAULT_USER_EMAIL,
       firebaseObfuscatedDefaultUserPassword: process.env.OBFUSCATED_DEFAULT_USER_PASSWORD,
       eas: {
-        projectId: "8caa5721-b096-47e9-b4b1-abdc4b019ed5"
+        projectId: "b6a2a08d-0517-4e79-b4b1-fab12bd4ae25"
       }
     },
   };

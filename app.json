@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "Scrute la nature",
-    "slug": "LPOMobApp",
-    "version": "2.0.0",
+    "slug": "semanature",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -29,7 +29,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "owner": "lpo",
+    "owner": "lpoaura",
     "extra": {
       "eas": {
         "projectId": "8caa5721-b096-47e9-b4b1-abdc4b019ed5"
